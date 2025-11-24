@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 import os
 
 # --- 1. KONFIGURASI API (AMBIL DARI ENVIRONMENT SERVER) ---
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://bzkrxdcdnwucawetsmeg.supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ6a3J4ZGNkbnd1Y2F3ZXRzbWVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5ODAwMTcsImV4cCI6MjA3OTU1NjAxN30.zqtp_N1ekrpjNTR7o7c_83kZ0dYMD3nKzA1RUyH8nC4")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBkLqFMiUAjkiS4KWmFRbBgYyv-VG6qIyU")
 
 # Setup Clients
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -361,4 +361,4 @@ def main(page: ft.Page):
     # Mulai dari Halaman Login
     init_login_page()
 
-ft.app(target=main)
+ft.app(target=main, view=ft.WEB_BROWSER, port=8000, host="0.0.0.0")
