@@ -6,6 +6,7 @@ import json
 import threading
 import PIL.Image
 from datetime import datetime, timedelta
+from dateutil import parser
 import os
 
 # --- 1. KONFIGURASI API (AMBIL DARI ENVIRONMENT SERVER) ---
@@ -328,19 +329,36 @@ def main(page: ft.Page):
                     perc = min(1.0, b['jumlah'] / b['batas_nominal']) if b.get('batas_nominal') else 0
                     row_budgets.controls.append(ft.Container(content=ft.Column([ft.Text(b['kategori'], size=12, weight="bold"), ft.Text(format_currency(b['jumlah']), size=14, weight="bold", color=COLOR_PRIMARY), ft.Text(limit_txt, size=10, color="grey"), ft.ProgressBar(value=perc, color=COLOR_PRIMARY, bgcolor="#E0E7FF", height=4)], spacing=2), width=150, height=100, bgcolor=COLOR_SURFACE, border_radius=15, padding=15, shadow=ft.BoxShadow(blur_radius=5, color=SHADOW_LIGHT)))
 
-            list_transaksi.controls.clear()
-            # Filter Transaksi BY USER
-            data_trx = supabase.table('transaksi').select("*").eq('user_id', CURRENT_USER['id']).order('created_at', desc=True).limit(20).execute().data
-            for item in data_trx:
-                is_in = item['kategori'] == "Pemasukan"; color = COLOR_SUCCESS if is_in else COLOR_DANGER
-                sign = "+" if is_in else "-"; bg = COLOR_GREEN_FADE if is_in else COLOR_RED_FADE
-                dt = datetime.fromisoformat(item['created_at'].replace('Z', '+00:00')) + timedelta(hours=7)
-                list_transaksi.controls.append(ft.Container(content=ft.Row([ft.Container(ft.Icon(ft.Icons.ARROW_DOWNWARD if is_in else ft.Icons.ARROW_UPWARD, color=color, size=18), bgcolor=bg, padding=10, border_radius=10), ft.Column([ft.Text(item['keterangan'], weight="bold"), ft.Text(f"{item['kategori']} • {dt.strftime('%d %b %H:%M')}", size=11, color="grey")], expand=True), ft.Text(f"{sign} {format_currency(item['nominal'])}", color=color, weight="bold")], alignment="spaceBetween"), bgcolor=COLOR_SURFACE, padding=12, border_radius=12, margin=ft.margin.only(bottom=5), shadow=ft.BoxShadow(blur_radius=2, color=SHADOW_LIGHT)))
-
-            list_settings_kategori.controls.clear(); list_settings_amplop.controls.clear()
-            for k in kat_db: list_settings_kategori.controls.append(ft.Container(ft.Row([ft.Text(k, expand=True), ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color=COLOR_DANGER, on_click=lambda e, x=k: hapus_kategori(x))]), bgcolor=COLOR_BG, padding=10, border_radius=8))
-            for b in list_b: list_settings_amplop.controls.append(ft.Container(ft.Row([ft.Column([ft.Text(b['kategori'], weight="bold"), ft.Text(f"Sisa: {format_currency(b['jumlah'])}", size=11)], expand=True), ft.IconButton(ft.Icons.EDIT, icon_color=COLOR_PRIMARY, on_click=lambda e, x=b: open_edit_amplop(x)), ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color=COLOR_DANGER, on_click=lambda e, x=b['id']: hapus_amplop(b['id']))]), bgcolor=COLOR_BG, padding=10, border_radius=8))
-            page.update()
+            data_trx = supabase.table('transaksi').select("*").order('created_at', desc=True).limit(20).execute().data
+        
+        for item in data_trx:
+            is_in = item['kategori'] == "Pemasukan"
+            color = COLOR_SUCCESS if is_in else COLOR_DANGER
+            bg_color = COLOR_GREEN_FADE if is_in else COLOR_RED_FADE 
+            sign = "+" if is_in else "-"
+            
+            # --- BAGIAN PERBAIKAN START ---
+            try:
+                # Menggunakan parser agar tidak crash walau digit waktunya aneh
+                dt = parser.isoparse(item['created_at']) + timedelta(hours=7)
+                waktu_str = dt.strftime('%d %b %H:%M')
+            except:
+                waktu_str = "-"
+            # --- BAGIAN PERBAIKAN END ---
+            
+            list_transaksi.controls.append(ft.Container(
+                content=ft.Row([
+                    ft.Container(content=ft.Icon(ft.Icons.ARROW_DOWNWARD if is_in else ft.Icons.ARROW_UPWARD, color=color, size=18), 
+                                 bgcolor=bg_color, padding=10, border_radius=10),
+                    ft.Column([
+                        ft.Text(item['keterangan'], weight="bold", color=COLOR_TEXT_MAIN),
+                        ft.Text(f"{item['kategori']} • {waktu_str}", size=11, color=COLOR_TEXT_SUB)
+                    ], expand=True, spacing=2),
+                    ft.Text(f"{sign} {format_currency(item['nominal'])}", color=color, weight="bold")
+                ], alignment="spaceBetween"),
+                bgcolor=COLOR_SURFACE, padding=12, border_radius=12, margin=ft.margin.only(bottom=5),
+                shadow=ft.BoxShadow(blur_radius=2, color=SHADOW_LIGHT)
+            ))
 
         page.add(t); refresh_all()
 
@@ -363,3 +381,4 @@ def main(page: ft.Page):
 
 
 ft.app(target=main, view=ft.WEB_BROWSER, port=8000, host="0.0.0.0")
+
