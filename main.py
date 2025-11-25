@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 from dateutil import parser
 import os
 
-# --- 1. KONFIGURASI API (AMBIL DARI ENVIRONMENT SERVER) ---
+# --- 1. KONFIGURASI API ---
+# Mengambil dari Environment Variables (Koyeb)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -20,7 +21,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('models/gemini-flash-latest')
 
 # --- 2. VARIABEL GLOBAL ---
-CURRENT_USER = None # Menyimpan data user yang sedang login {id: 1, nama: "Budi"}
+CURRENT_USER = None 
 pending_trx = {} 
 
 # --- 3. WARNA & THEME ---
@@ -40,7 +41,7 @@ COLOR_GREEN_FADE = "#3310B981"
 COLOR_RED_FADE = "#33EF4444"   
 
 def main(page: ft.Page):
-    page.title = "Smart Budgeting AI (Multi-User)"
+    page.title = "Smart Budgeting AI"
     page.window_width = 400
     page.window_height = 850
     page.bgcolor = COLOR_BG
@@ -68,29 +69,25 @@ def main(page: ft.Page):
             if not dd_user_select.value:
                 show_snack("Pilih user dulu!", COLOR_DANGER); return
             
-            # Set User Aktif
             user_id = int(dd_user_select.value)
             user_name = next((u.text for u in user_options if u.key == dd_user_select.value), "User")
             CURRENT_USER = {"id": user_id, "nama": user_name}
             
             show_snack(f"Selamat datang, {user_name}!", COLOR_SUCCESS)
-            init_main_app() # Masuk ke Dashboard
+            init_main_app() 
 
         def create_user_clicked(e):
             if not txt_new_user.value: return
-            # 1. Buat User
             res = supabase.table('users').insert({"nama": txt_new_user.value}).execute()
             new_id = res.data[0]['id']
             
-            # 2. Setup Data Awal untuk User Baru (Rekening & Kategori Default)
             supabase.table('rekening').insert({"user_id": new_id, "saldo": 0}).execute()
             default_cats = [{"user_id": new_id, "nama": "Makan"}, {"user_id": new_id, "nama": "Transport"}]
             supabase.table('opsi_kategori').insert(default_cats).execute()
             
             show_snack("User berhasil dibuat!", COLOR_SUCCESS)
-            init_login_page() # Refresh halaman login
+            init_login_page() 
 
-        # UI Login
         page.add(
             ft.Container(
                 content=ft.Column([
@@ -117,7 +114,7 @@ def main(page: ft.Page):
     def init_main_app():
         page.clean()
         
-        # --- LOGIKA DATABASE (DIFILTER BY USER_ID) ---
+        # --- LOGIKA DATABASE ---
         def get_saldo_total():
             try:
                 res = supabase.table('rekening').select("saldo").eq('user_id', CURRENT_USER['id']).execute()
@@ -178,7 +175,6 @@ def main(page: ft.Page):
             global current_saldo
             try:
                 kurangi_budget(data['kategori'], data['nominal'])
-                # INSERT dengan USER_ID
                 data['user_id'] = CURRENT_USER['id']
                 supabase.table('transaksi').insert(data).execute()
                 
@@ -229,7 +225,7 @@ def main(page: ft.Page):
             data_payload = {"user_id": CURRENT_USER['id'], "kategori": nama, "jumlah": jml, "batas_nominal": batas, "tipe_batas": tipe}
             
             if cek.data:
-                data_payload['jumlah'] += cek.data[0]['jumlah'] # Tambah saldo lama
+                data_payload['jumlah'] += cek.data[0]['jumlah']
                 supabase.table('pos_anggaran').update(data_payload).eq('id', cek.data[0]['id']).execute()
             else:
                 supabase.table('pos_anggaran').insert(data_payload).execute()
@@ -280,7 +276,7 @@ def main(page: ft.Page):
                 finally: btn_scan.icon, btn_scan.bgcolor = ft.Icons.CAMERA_ALT, COLOR_SUCCESS; page.update()
             threading.Thread(target=run).start()
 
-        # --- KOMPONEN UI UTAMA ---
+        # --- KOMPONEN UI ---
         txt_confirm_msg = ft.Text("", color=COLOR_TEXT_MAIN)
         dlg_confirm = ft.AlertDialog(modal=True, title=ft.Text("Konfirmasi"), content=txt_confirm_msg, actions=[ft.TextButton("Batal", on_click=lambda e: page.close(dlg_confirm)), ft.ElevatedButton("Lanjut", on_click=lambda e: execute_transaction(pending_trx), bgcolor=COLOR_DANGER, color="white")], bgcolor=COLOR_SURFACE)
         
@@ -303,62 +299,74 @@ def main(page: ft.Page):
         btn_scan = ft.IconButton(ft.Icons.CAMERA_ALT, icon_color="white", bgcolor=COLOR_SUCCESS, on_click=lambda _: file_picker.pick_files(allow_multiple=False, allowed_extensions=["png", "jpg"]))
         list_transaksi = ft.ListView(expand=1, spacing=10)
 
-        # Settings UI
         set_input_saldo = create_input("Input Pemasukan (+)", ft.KeyboardType.NUMBER, force_number_only, True)
         set_input_kategori = create_input("Kategori Baru", expand=True)
         list_settings_kategori = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
         list_settings_amplop = ft.Column(spacing=10, scroll=ft.ScrollMode.AUTO)
 
-        # Tabs
         tab_home = ft.Container(content=ft.Column([header_saldo, ft.Text("Monitor Budget", weight="bold"), row_budgets, ft.Divider(), ft.Row([ft.Container(btn_mic), ft.Container(btn_scan), ft.Text("Input AI", color="grey")], alignment="center"), txt_nominal, txt_keterangan, dd_kategori, ft.Container(ft.ElevatedButton("Simpan Transaksi", on_click=check_transaction, bgcolor=COLOR_PRIMARY, color="white", height=50), width=float("inf")), ft.Divider(), ft.Text("Riwayat", weight="bold"), list_transaksi], scroll=ft.ScrollMode.HIDDEN), padding=20)
         tab_settings = ft.Container(content=ft.Column([create_card(ft.Column([ft.Text("Saldo Utama", weight="bold"), ft.Row([set_input_saldo, ft.IconButton(ft.Icons.ADD_CARD, icon_color=COLOR_PRIMARY, on_click=simpan_saldo)])])), ft.Container(height=10), create_card(ft.Column([ft.Text("Kategori", weight="bold"), ft.Row([set_input_kategori, ft.IconButton(ft.Icons.ADD_CIRCLE, icon_color=COLOR_SUCCESS, on_click=tambah_kategori)]), ft.Container(list_settings_kategori, height=150)])), ft.Container(height=10), create_card(ft.Column([ft.Row([ft.Text("Amplop", weight="bold"), ft.ElevatedButton("Buat Baru", on_click=lambda e: (setattr(dd_pilih_kategori_budget, 'value', None), setattr(dlg_jml_budget, 'value', ""), page.open(dlg_budget_modal)), bgcolor=COLOR_SUCCESS, color="white")], alignment="spaceBetween"), ft.Container(list_settings_amplop, height=200)]))], scroll=ft.ScrollMode.AUTO), padding=20)
         
         t = ft.Tabs(selected_index=0, tabs=[ft.Tab(text="Dashboard", icon=ft.Icons.DASHBOARD, content=tab_home), ft.Tab(text="Pengaturan", icon=ft.Icons.SETTINGS, content=tab_settings)], expand=1, divider_color="transparent", indicator_color=COLOR_PRIMARY, label_color=COLOR_PRIMARY, unselected_label_color=COLOR_TEXT_SUB)
 
+        # --- FUNGSI REFRESH (INILAH BAGIAN UTAMA YANG DIPERBAIKI) ---
         def refresh_all():
+            # Update Data Keuangan
             ub, list_b = hitung_uang_bebas()
-            txt_total_saldo.value = format_currency(get_saldo_total()); txt_uang_bebas.value = f"Bebas: {format_currency(ub)}"
+            txt_total_saldo.value = format_currency(get_saldo_total())
+            txt_uang_bebas.value = f"Bebas: {format_currency(ub)}"
+            
+            # Update Dropdown Kategori
             kat_db = get_kategori_list()
-            dd_kategori.options = [ft.dropdown.Option(k) for k in kat_db]; dd_pilih_kategori_budget.options = [ft.dropdown.Option(k) for k in kat_db]
+            dd_kategori.options = [ft.dropdown.Option(k) for k in kat_db]
+            dd_pilih_kategori_budget.options = [ft.dropdown.Option(k) for k in kat_db]
 
+            # Update UI Amplop (Dashboard)
             row_budgets.controls.clear()
-            if not list_b: row_budgets.controls.append(ft.Text("Tidak ada budget", color="grey"))
+            if not list_b: 
+                row_budgets.controls.append(ft.Text("Tidak ada budget", color="grey"))
             else:
                 for b in list_b:
                     limit_txt = f"Limit: {format_currency(b['batas_nominal'])}/{b['tipe_batas'][0]}" if b.get('batas_nominal') else "No Limit"
                     perc = min(1.0, b['jumlah'] / b['batas_nominal']) if b.get('batas_nominal') else 0
                     row_budgets.controls.append(ft.Container(content=ft.Column([ft.Text(b['kategori'], size=12, weight="bold"), ft.Text(format_currency(b['jumlah']), size=14, weight="bold", color=COLOR_PRIMARY), ft.Text(limit_txt, size=10, color="grey"), ft.ProgressBar(value=perc, color=COLOR_PRIMARY, bgcolor="#E0E7FF", height=4)], spacing=2), width=150, height=100, bgcolor=COLOR_SURFACE, border_radius=15, padding=15, shadow=ft.BoxShadow(blur_radius=5, color=SHADOW_LIGHT)))
 
-            data_trx = supabase.table('transaksi').select("*").order('created_at', desc=True).limit(20).execute().data
-        
-        for item in data_trx:
-            is_in = item['kategori'] == "Pemasukan"
-            color = COLOR_SUCCESS if is_in else COLOR_DANGER
-            bg_color = COLOR_GREEN_FADE if is_in else COLOR_RED_FADE 
-            sign = "+" if is_in else "-"
+            # Update UI Transaksi (Dashboard)
+            list_transaksi.controls.clear()
+            data_trx = supabase.table('transaksi').select("*").eq('user_id', CURRENT_USER['id']).order('created_at', desc=True).limit(20).execute().data
             
-            # --- BAGIAN PERBAIKAN START ---
-            try:
-                # Menggunakan parser agar tidak crash walau digit waktunya aneh
-                dt = parser.isoparse(item['created_at']) + timedelta(hours=7)
-                waktu_str = dt.strftime('%d %b %H:%M')
-            except:
-                waktu_str = "-"
-            # --- BAGIAN PERBAIKAN END ---
+            for item in data_trx:
+                is_in = item['kategori'] == "Pemasukan"
+                color = COLOR_SUCCESS if is_in else COLOR_DANGER
+                bg_color = COLOR_GREEN_FADE if is_in else COLOR_RED_FADE 
+                sign = "+" if is_in else "-"
+                
+                try:
+                    dt = parser.isoparse(item['created_at']) + timedelta(hours=7)
+                    waktu_str = dt.strftime('%d %b %H:%M')
+                except:
+                    waktu_str = "-"
+                
+                list_transaksi.controls.append(ft.Container(
+                    content=ft.Row([
+                        ft.Container(content=ft.Icon(ft.Icons.ARROW_DOWNWARD if is_in else ft.Icons.ARROW_UPWARD, color=color, size=18), bgcolor=bg_color, padding=10, border_radius=10),
+                        ft.Column([ft.Text(item['keterangan'], weight="bold", color=COLOR_TEXT_MAIN), ft.Text(f"{item['kategori']} • {waktu_str}", size=11, color=COLOR_TEXT_SUB)], expand=True),
+                        ft.Text(f"{sign} {format_currency(item['nominal'])}", color=color, weight="bold")
+                    ], alignment="spaceBetween"),
+                    bgcolor=COLOR_SURFACE, padding=12, border_radius=12, margin=ft.margin.only(bottom=5), shadow=ft.BoxShadow(blur_radius=2, color=SHADOW_LIGHT)
+                ))
+
+            # Update UI Settings (Kategori & Amplop)
+            list_settings_kategori.controls.clear()
+            list_settings_amplop.controls.clear()
             
-            list_transaksi.controls.append(ft.Container(
-                content=ft.Row([
-                    ft.Container(content=ft.Icon(ft.Icons.ARROW_DOWNWARD if is_in else ft.Icons.ARROW_UPWARD, color=color, size=18), 
-                                 bgcolor=bg_color, padding=10, border_radius=10),
-                    ft.Column([
-                        ft.Text(item['keterangan'], weight="bold", color=COLOR_TEXT_MAIN),
-                        ft.Text(f"{item['kategori']} • {waktu_str}", size=11, color=COLOR_TEXT_SUB)
-                    ], expand=True, spacing=2),
-                    ft.Text(f"{sign} {format_currency(item['nominal'])}", color=color, weight="bold")
-                ], alignment="spaceBetween"),
-                bgcolor=COLOR_SURFACE, padding=12, border_radius=12, margin=ft.margin.only(bottom=5),
-                shadow=ft.BoxShadow(blur_radius=2, color=SHADOW_LIGHT)
-            ))
+            for k in kat_db: 
+                list_settings_kategori.controls.append(ft.Container(ft.Row([ft.Text(k, expand=True), ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color=COLOR_DANGER, on_click=lambda e, x=k: hapus_kategori(x))]), bgcolor=COLOR_BG, padding=10, border_radius=8))
+            
+            for b in list_b: 
+                list_settings_amplop.controls.append(ft.Container(ft.Row([ft.Column([ft.Text(b['kategori'], weight="bold"), ft.Text(f"Sisa: {format_currency(b['jumlah'])}", size=11)], expand=True), ft.IconButton(ft.Icons.EDIT, icon_color=COLOR_PRIMARY, on_click=lambda e, x=b: open_edit_amplop(x)), ft.IconButton(ft.Icons.DELETE_OUTLINE, icon_color=COLOR_DANGER, on_click=lambda e, x=b['id']: hapus_amplop(b['id']))]), bgcolor=COLOR_BG, padding=10, border_radius=8))
+            
+            page.update()
 
         page.add(t); refresh_all()
 
@@ -379,6 +387,5 @@ def main(page: ft.Page):
     # Mulai dari Halaman Login
     init_login_page()
 
-
+# Jalankan di Port 8000 untuk Koyeb
 ft.app(target=main, view=ft.WEB_BROWSER, port=8000, host="0.0.0.0")
-
