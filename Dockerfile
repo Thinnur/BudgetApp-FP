@@ -12,10 +12,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy kode aplikasi
+# Copy semua kode aplikasi
 COPY . .
 
-# Beri izin
+# Beri izin akses file
 RUN chmod -R 777 /app
 
 # Buka PORT 8000 (Standar Koyeb)
